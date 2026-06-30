@@ -1,0 +1,45 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: finmind-ai
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/finmind}
+    username: ${POSTGRES_USER:finmind}
+    password: ${POSTGRES_PASSWORD:finmind}
+  ai:
+    model:
+      chat: ollama
+      embedding: ollama
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      chat:
+        model: ${OLLAMA_CHAT_MODEL:qwen2.5:7b}
+        temperature: ${OLLAMA_CHAT_TEMPERATURE:0.1}
+      embedding:
+        model: ${OLLAMA_EMBEDDING_MODEL:mxbai-embed-large}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        table-name: finmind_knowledge_vectors
+        max-document-batch-size: 1000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+finmind:
+  knowledge:
+    auto-ingest: true
+    chunk-size: 1200
+    chunk-overlap: 160
+  alpha-vantage:
+    api-key: ${ALPHA_VANTAGE_API_KEY:demo}
+    base-url: ${ALPHA_VANTAGE_BASE_URL:https://www.alphavantage.co}
+  sec:
+    user-agent: ${SEC_USER_AGENT:FinMindAI/0.1 contact@example.com}
