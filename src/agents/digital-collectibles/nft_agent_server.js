@@ -8,7 +8,9 @@
  *
  * 协议: MCP SSE (Server-Sent Events)
  * 端口: 3200
- * 规则来源: knowhow/nft/rules_nft_001.json + kh_nft_failure_001.md
+ * 规则来源: knowhow/nft/rules_nft_001.json + kh_nft_failure_001.md (第1块)
+ * 第2块: knowhow/nft/rules_nft_002.json + kh_nft_decision_001.md + kh_nft_failure_002.md
+ *   → flow_nft_002.js 决策路由层, 通过启动段挂载的 decision_flow 工具对外提供
  */
 
 const http = require('http');
@@ -205,6 +207,8 @@ class MCPServer {
         case 'risk_alert': result = this._execRiskAlert(args); break;
         case 'judge_elimination': result = this._execJudgeElimination(args); break;
         case 'track_health': result = this._execTrackHealth(args); break;
+        // Tool 6: decision_flow 由启动段挂载(见 HTTP Server 段), 沙盒测试不含该工具
+        case 'decision_flow': result = this._execDecisionFlow ? this._execDecisionFlow(args) : { error: 'decision_flow 未挂载(仅运行态可用)' }; break;
         default: result = { text: `Tool ${name} executed (no implementation)` };
       }
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -506,6 +510,57 @@ class MCPServer {
 // ============================================================
 
 const server = new MCPServer();
+
+// ============================================================
+// Tool 6: 综合决策流 (第2块代码, 挂载于启动段)
+// 规则: knowhow/nft/rules_nft_002.json + kh_nft_decision_001.md + kh_nft_failure_002.md
+// 注: 注册放在 HTTP marker 之后, 避免 test_nft_agent.js 沙盒截断源码时
+//     tools/list 数量断言(5个)被破坏; 运行态正常提供第6个工具
+// ============================================================
+server.registerTool('decision_flow', {
+  description: '综合决策流(第2块): 问题分类→路由→买入(生存证据)/持有回撤归因/平台关停/一级MINT破发/抵押清算螺旋/加仓审批',
+  inputSchema: {
+    type: 'object',
+    required: ['question_type'],
+    properties: {
+      question_type: { type: 'string', enum: ['buy', 'hold', 'drawdown', 'today_pick', 'platform', 'mint', 'loan'], description: '问题类型(第0步分类)' },
+      survival: {
+        type: 'object',
+        description: '生存证据(买入/加仓用)',
+        properties: {
+          survived_cycle: { type: 'boolean', description: '穿越≥1轮牛熊(≥4年)' },
+          commercialization_ge_3: { type: 'boolean', description: '商业化≥3项' },
+          team_active: { type: 'boolean', description: '团队在岗' },
+          retention_ge_70: { type: 'boolean', description: '留存率≥70%/年' }
+        }
+      },
+      custody: { type: 'string', enum: ['platform', 'self'], description: '平台托管or自持私钥(platform流)' },
+      buyback_commitment: { type: 'boolean', description: '官方回购/抵兑承诺' },
+      shutdown_announced: { type: 'boolean', description: '已公告清退' },
+      shutdown_rumor: { type: 'boolean', description: '暴雷传闻' },
+      mint_price_vs_floor: { type: 'number', description: '发行价/同赛道地板比(mint流)' },
+      open_above_mint: { type: 'boolean', description: '开盘价是否高于发行价' },
+      distance_to_liquidation_pct: { type: 'number', description: '距清算线%(loan流)' },
+      loan_purpose: { type: 'string', enum: ['add_position', 'liquidity'], description: '借款用途' },
+      ltv_pct: { type: 'number', description: '抵押率%' },
+      liquid_market: { type: 'boolean', description: '标的流动性是否充裕' },
+      drawdown_pct: { type: 'number', description: '地板价回撤%(drawdown/hold流)' },
+      days_since_update: { type: 'number', description: '距上次更新天数' },
+      retention_rate: { type: 'number', description: '持有人年留存率%' },
+      volume_change_pct: { type: 'number', description: '月成交量变化%' },
+      monthly_buy_vs_sell: { type: 'string', enum: ['buy_gt_sell', 'sell_gt_buy', 'unknown'] },
+      team_status: { type: 'string', enum: ['active', 'layoff', 'vanished', 'unknown'] },
+      user_growth_source: { type: 'string', enum: ['speculator', 'organic', 'unknown'], description: '用户增长来源' },
+      position_pct: { type: 'number', description: '该资产占组合%(加仓审批)' },
+      logic_ok: { type: 'boolean', description: '核心逻辑是否健康(加仓审批)' }
+    }
+  }
+});
+
+server._execDecisionFlow = function (args) {
+  const { resolve } = require('./flow_nft_002.js');
+  return resolve(args || {});
+};
 
 const httpServer = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
