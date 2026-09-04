@@ -4,8 +4,8 @@
   "description": "🏗️ 金融智能Agent仓库 — Know-how Library: NFT/数字藏品 + 股票/期货Research OS",
   "private": true,
   "scripts": {
-    "test": "node tests/stock-research-os/test_research_os.js && node tests/digital-collectibles/test_nft_agent.js && node tests/digital-collectibles/test_flow_nft_002.js",
-    "test:nft": "node tests/digital-collectibles/test_nft_agent.js && node tests/digital-collectibles/test_flow_nft_002.js",
+    "test": "node tests/stock-research-os/test_research_os.js && node tests/digital-collectibles/test_nft_agent.js && node tests/digital-collectibles/test_flow_nft_002.js && node tests/digital-collectibles/test_flow_nft_003.js",
+    "test:nft": "node tests/digital-collectibles/test_nft_agent.js && node tests/digital-collectibles/test_flow_nft_002.js && node tests/digital-collectibles/test_flow_nft_003.js",
     "start": "node src/agents/stock-research-os/research_os_server.js",
     "start:nft": "node src/agents/digital-collectibles/nft_agent_server.js"
   },

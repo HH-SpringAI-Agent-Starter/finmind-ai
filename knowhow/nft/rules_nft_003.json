@@ -1,0 +1,68 @@
+{
+  "id": "kh_nft_rules_003",
+  "type": "业务规则",
+  "created": "2026-09-04",
+  "verified": false,
+  "confidence": "高",
+  "source": "SOUL.md 规则25 数字藏品价值投资 V6.0 + kh_nft_rules_001.json(单一系列≤10%铁律) + kh_nft_decision_001.md(仓位约束) + kh_nft_failure_001.md(仓位失控=失败案例A病根) + kh_nft_failure_002.md(平台关停/清算螺旋优先级)",
+  "relation_to_002": "rules_002 = 单问题决策路由层(一个提问→分类→子流)；本文件 = 组合层调度规则(已有持仓→批量扫描→动作清单→退出执行)。002 回答'这笔该怎么判'，003 回答'整个组合现在该怎么管'。",
+
+  "portfolio_caps": {
+    "core": { "pct": 60, "tolerance": 5, "horizon": "5-10年", "desc": "核心仓: 穿越牛熊的确定性资产" },
+    "growth": { "pct": 30, "tolerance": 5, "horizon": "3-5年", "desc": "成长仓: 赛道成长期的资产" },
+    "watch": { "pct": 10, "tolerance": 5, "horizon": "1-3年", "desc": "观察仓: 验证逻辑的小仓位" },
+    "single_asset_cap_pct": 10,
+    "core_idea": "配比是约束不是目标——核心60/成长30/观察10 是上限护栏，超了必须动作；观察仓是最容易被'顺便加码'的仓位，超15%即强制降回10%"
+  },
+
+  "rebalance_rules": [
+    { "trigger": "single_asset_pct > 10", "priority": "P1", "action": "强制减仓至≤10%（分批执行，禁止一次性市价砸穿地板）", "law": "rules_001 铁律#2: 单一系列投资≤总投资额10%" },
+    { "trigger": "watch_pct > 15", "priority": "P1", "action": "强制降回10%——观察仓悄悄加码=失败案例A仓位失控的前兆", "law": "观察仓上限最严，因为它在'验证'阶段最容易被情绪扩大" },
+    { "trigger": "growth_pct > 40", "priority": "P1", "action": "强制再平衡：超出的成长仓分批转入核心仓或现金", "law": "成长仓本质是高风险敞口，超配=重新押注赛道" },
+    { "trigger": "core_pct < 50", "priority": "P2", "action": "检视不自动补：核心仓跌破护栏说明卖错了或买错标的上位，需重新走买入流", "law": "禁止'为了凑比例'买入，补核心=新决策，走完整买入流" }
+  ],
+
+  "scan_rules": {
+    "frequency": "每周一次全量扫描 + 任一持仓触发P0信号立即扫描全组合",
+    "per_holding_signals": [
+      { "key": "platform_shutdown", "trigger": "custody=platform 且 shutdown_announced=true", "priority": "P0", "action": "唯一动作=尽快提现/卖出，不分散批次（通道消失，时间优先）", "case_ref": "失败案例D" },
+      { "key": "liquidation_spiral", "trigger": "is_loan=true 且 liq_buffer<30", "priority": "P0", "action": "立即降杠杆：还贷/补保证金，不等强平（一次波动即触发）", "case_ref": "失败案例F" },
+      { "key": "shutdown_rumor", "trigger": "custody=platform 且 shutdown_rumor=true 且未公告", "priority": "P1", "action": "先降仓位，绝不再入场", "case_ref": "失败案例D" },
+      { "key": "floor_crash", "trigger": "floor_change_pct<=-50", "priority": "P1", "action": "启动深度归因(复用flow_002.drawdownAttribution)：逻辑失效→淘汰，逻辑健康→持有观察", "case_ref": "失败案例B(蓝筹半山腰)" },
+      { "key": "retention_broken", "trigger": "retention_pct<70", "priority": "P1", "action": "逻辑在坏：需求消退信号，进入观察并准备退出", "case_ref": "失败案例B" },
+      { "key": "liquidity_dry", "trigger": "volume_change_pct<=-50", "priority": "P1", "action": "流动性枯竭：退出窗口在收窄，尽早分批走", "case_ref": "失败案例B" },
+      { "key": "team_inactive", "trigger": "team_active=false", "priority": "P1", "action": "运营失效：团队隐身/裁员=项目死亡前兆", "case_ref": "失败案例A" },
+      { "key": "stop_update", "trigger": "stop_update_days>=90", "priority": "P2", "action": "黄色警告：进入观察，设30天复查", "law": "rules_001 铁律#3" },
+      { "key": "mutual_cut", "trigger": "month_sell>month_buy", "priority": "P2", "action": "存量互割信号：新资金不进，价格靠互割维持，观察", "case_ref": "失败案例B" },
+      { "key": "data_missing", "trigger": "关键信号缺失(成交量/留存率无数据)", "priority": "P2", "action": "数据缺失按保守处理：视为黄警，禁止因为'没数据'就默认健康" }
+    ],
+    "priority_order": "P0 > P1 > P2，多重信号取最高优先级，动作清单必须列出全部信号"
+  },
+
+  "exit_execution": {
+    "p0_platform": { "batch": "单笔100%立即", "note": "通道消失=价格归零倒计时，不追求卖价，只追求'卖得掉'" },
+    "p0_loan": { "batch": "立即还贷/补保证金100%", "note": "强平=被市场定价，主动降杠杆=自己定价" },
+    "p1_logic_failure": {
+      "batch": ["立即卖出50%", "7天内卖出30%", "14天内卖出20%"],
+      "price_guard": "挂单价≥地板价×(1-8%)，禁止市价单砸穿",
+      "volume_guard": "单笔卖出量≤当日成交量的10%，超限则拆单",
+      "note": "禁止'等反弹再卖'——深度回调策略胜率<15%，等反弹=重复失败案例B"
+    },
+    "p2_watch": { "batch": "不动作", "note": "设30天复查，触发P1信号再升级" },
+    "exception": [
+      "用户情绪化要求'全部清仓' → 安抚并按优先级分批，禁止恐慌一键市价（流动性差=自我砸穿）",
+      "真实现金流锚定的RWA债(非NFT存活逻辑) → 10%铁律仍执行，但淘汰判定走现金流估值，不走'存活率'",
+      "数据缺失 → 按最坏情况档位处理，不因缺失放行"
+    ]
+  },
+
+  "failure_boundaries": [
+    "适用于：跨多持仓的数字藏品/NFT组合的仓位管理、批量风险扫描、退出执行规划",
+    "不适用于：单问题即时决策（走rules_002/flow_002）；用户明确短线/打板（V6.0 颠倒设计不支持）",
+    "不适用于：交易所流通的数字证券、稳定现金流RWA债权的估值（走向不同估值逻辑）",
+    "已知缺陷：无法预测'何时反弹'，分批退出也可能卖在半山腰；平台关停存在信息差（公告前渠道已失效），扫描依赖信号及时性",
+    "成功率：10%铁律+配比护栏可把'仓位失控'类致命亏损(失败案例A的-98%)概率压到可忽略；但组合层无法凭空创造alpha，只能防死"
+  ],
+
+  "experience_weight": "高 — 把散落在 rules_001 的铁律、decision_001 的仓位约束、failure_001/002 的死亡案例串成可执行的组合调度层：铁律→扫描→优先级→退出执行，是 Agent 从'问答器'走向'组合管家'的关键一块"
+}
